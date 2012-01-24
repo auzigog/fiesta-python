@@ -26,6 +26,19 @@ import urllib2
 # http://docs.fiesta.cc/list-management-api.html#getting-group-user-information
 
 
+class FiestaException(Exception):
+    code = None
+    error = None
+    error_description = None
+    request = None
+
+    def __init__(self, code, error=None, error_description=None, request=None, *args, **kwargs):
+        super(FiestaExceiption, self).__init__(*args, **kwargs)
+        self.code = code
+        self.error = error
+        self.error_description = error_description
+        self.request = request
+
 
 class FiestaAPI(object):
     """
@@ -39,6 +52,7 @@ class FiestaAPI(object):
 
     # Store recent request and response information
     _last_request = None
+    _last_request_error_occured = False
     _last_response = None
     _last_response_str = None
     _last_status_code = None
@@ -73,10 +87,7 @@ class FiestaAPI(object):
             basic_auth = base64.b64encode("%s:%s" % (self.client_id, self.client_secret))
             request.add_header("Authorization", "Basic %s" % basic_auth)
 
-        try:
-            response = self._make_request(request)
-        except Exception as inst:
-            raise # automatically re-raises the exception
+        response = self._make_request(request)
 
         if 'status' in response:
             # Grab the status info if it exists
@@ -94,14 +105,32 @@ class FiestaAPI(object):
         Does the magic of actually sending the request and parsing the response
         """
         # TODO: I'm sure all kinds of error checking needs to go here
-        response_raw = urllib2.urlopen(request)
-        response_str = response_raw.read()
-        response = json.loads(response_str)
+        self._last_request_error_occured = False
+
+        try:
+            response_raw = urllib2.urlopen(request)
+            response_str = response_raw.read()
+            response = json.loads(response_str)
+        except urllib2.HTTPError, e:
+            # Error handling
+            code = e.code
+            response_str = e.read()
+            self._last_request_error_occured = True
+            response = json.loads(response_str)
+            error = response.get('error', None)
+            error_description = response.get('error_description', None)
+            raise FiestaException(code=code,error=error,error_description=error_description,request=request)
+
+
+
 
         self._last_request = request
-        self._last_response = response_raw
         self._last_response_str = response_str
         return response
+
+    def is_error(self):
+        """Checks to see if an error occured on the last request"""
+        return self._last_request_error_occured
 
     def hello(self):
         """http://docs.fiesta.cc/index.html#getting-started"""

@@ -1,6 +1,6 @@
 import unittest
 
-from fiesta import FiestaAPI, FiestaAPISandbox, FiestaGroup, FiestaUser
+from fiesta.fiesta import FiestaAPI, FiestaAPISandbox, FiestaGroup, FiestaUser, FiestaException
 from settings_test import FIESTA_CLIENT_ID, FIESTA_CLIENT_SECRET
 
 
@@ -37,3 +37,8 @@ class FiestaListManagementTestCase(FiestaBaseTestCase):
         self.assertTrue(user is not None, msg=u"User does not exist")
         self.assertTrue(len(user.id) > 1, msg=u"User ID was not stored")
 #        self.assertTrue()  # test that user_group_name matches default_group_name
+
+    def test_should_error_on_long_group_name(self):
+        group_name = 'test-suite-group-with-name-that-is-too-long'
+
+        self.assertRaises(FiestaException, FiestaGroup.create, self.api, default_name=group_name, description=u"A group made by the fiesta test suite")
